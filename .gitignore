@@ -1,0 +1,49 @@
+# Laravel / PHP
+/vendor/
+/node_modules/
+/assets/hot
+/assets/storage
+/public/hot
+/public/storage
+/bootstrap/cache/*.php
+/storage/*.key
+/storage/logs/
+/storage/debugbar/
+/storage/framework/cache/data/
+/storage/framework/sessions/
+/storage/framework/testing/
+/storage/framework/views/*.php
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+auth.json
+
+# Test / build caches
+.phpunit.result.cache
+npm-debug.log
+yarn-error.log
+
+# Local machine files
+Homestead.json
+Homestead.yaml
+/.idea/
+/.vscode/
+
+# Flutter
+Flutter/bsicards_app/.dart_tool/
+Flutter/bsicards_app/.packages
+Flutter/bsicards_app/.flutter-plugins
+Flutter/bsicards_app/.flutter-plugins-dependencies
+Flutter/bsicards_app/build/
+Flutter/bsicards_app/android/.gradle/
+Flutter/bsicards_app/android/app/debug/
+Flutter/bsicards_app/android/app/profile/
+Flutter/bsicards_app/android/app/release/
+Flutter/bsicards_app/ios/Pods/
+Flutter/bsicards_app/ios/.symlinks/
+Flutter/bsicards_app/ios/Flutter/Flutter.framework
+Flutter/bsicards_app/ios/Flutter/Flutter.podspec
+Flutter/bsicards_app/ios/Flutter/Generated.xcconfig
+Flutter/bsicards_app/ios/Flutter/ephemeral/

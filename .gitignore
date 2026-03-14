@@ -30,6 +30,7 @@ Homestead.json
 Homestead.yaml
 /.idea/
 /.vscode/
+/Reseller.zip
 
 # Flutter
 Flutter/bsicards_app/.dart_tool/

@@ -44,7 +44,7 @@ class Setting extends Model
         if(!App::dbConnectionCheck()){
             return [];
         }
-        
+
         return (bool) self::getAllSettings()->whereStrict('name', $key)->count();
     }
 
@@ -165,7 +165,9 @@ class Setting extends Model
 
             case 'bool':
             case 'boolean':
-                return boolval($val);
+                // Normalize common string/number representations ("false", "0", "off") correctly.
+                $normalized = filter_var($val, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                return $normalized ?? false;
                 break;
 
             default:

@@ -22,7 +22,7 @@
             @include('frontend::include.__user_header')
             <div class="page-gap">
                 <div class="container-fluid">
-                    @if(auth()->user()->kyc !== \App\Enums\KYCStatus::Verified->value)
+                    @if(setting('kyc_verification','permission') && auth()->user()->kyc !== \App\Enums\KYCStatus::Verified->value)
                         @include('frontend::include.__kyc_warning')
                     @endif
                     @yield('content')

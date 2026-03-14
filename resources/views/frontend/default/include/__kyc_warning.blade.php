@@ -1,4 +1,4 @@
-@if($user->kyc == \App\Enums\KYCStatus::Pending->value)
+@if(setting('kyc_verification','permission') && $user->kyc == \App\Enums\KYCStatus::Pending->value)
     <div class="identity-alert pending">
         <div class="icon">
             <i data-lucide="info"></i>
@@ -10,7 +10,7 @@
             </div>
         </div>
     </div>
-@elseif($user->kyc == \App\Enums\KYCStatus::NOT_SUBMITTED->value)
+@elseif(setting('kyc_verification','permission') && $user->kyc == \App\Enums\KYCStatus::NOT_SUBMITTED->value)
     <div class="identity-alert not-approved">
         <div class="icon"><i data-lucide="alert-circle"></i></div>
         <div class="contents">

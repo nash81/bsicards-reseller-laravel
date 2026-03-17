@@ -14,6 +14,7 @@ import '../cards/cards_home_screen.dart';
 import '../deposit/deposit_screen.dart';
 import '../profile/profile_screen.dart';
 import '../transactions/transactions_screen.dart';
+import '../withdraw/withdraw_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -210,7 +211,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () => _showThemeSelector(sheetCtx, setModal),
               ),
               ListTile(
-                leading: Icon(Icons.logout_rounded, color: AppSemanticColors.error),
+                leading: const Icon(Icons.logout_rounded, color: AppSemanticColors.error),
                 title: Text(tr('logout'), style: const TextStyle(color: AppSemanticColors.error, fontWeight: FontWeight.w600)),
                 onTap: () async {
                   Navigator.pop(sheetCtx);
@@ -678,6 +679,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: context.colors.primary,
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const DepositScreen())),
+      ),
+      _ActionItem(
+        icon: Icons.arrow_downward_rounded,
+        label: context.tr('withdraw'),
+        color: const Color(0xFFF59E0B),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const WithdrawScreen())),
       ),
       _ActionItem(
         icon: Icons.credit_card_rounded,

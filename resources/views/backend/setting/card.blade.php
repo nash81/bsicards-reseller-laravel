@@ -26,7 +26,7 @@
                             <div class="col-xl-4 col-lg-4 col-md-4 col-sm-12">
                                 <div class="site-input-groups">
                                     <label for=""
-                                           class="box-input-label col-label">{{ __('BSI Public Key') }}</label>
+                                           class="box-input-label col-label">{{ __('Reseller Public Key') }}</label>
                                     <input
                                         type="text"
                                         class="box-input"
@@ -39,7 +39,7 @@
                             <div class="col-xl-4 col-lg-4 col-md-4 col-sm-12">
                                 <div class="site-input-groups">
                                     <label for=""
-                                           class="box-input-label col-label">{{ __('BSI Secret Key') }}</label>
+                                           class="box-input-label col-label">{{ __('Reseller Secret Key') }}</label>
                                     <input
                                         type="text"
                                         class="box-input"

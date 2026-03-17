@@ -57,15 +57,25 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     setState(() => _loading = true);
     try {
       Map<String, dynamic> data;
+      final fallbackCard = _detail ?? widget.card;
       switch (widget.card.cardType) {
         case 'master':
-          data = await CardService.getMasterCardDetail(widget.card.cardId);
+          data = await CardService.getMasterCardDetail(
+            widget.card.cardId,
+            fallbackCard: fallbackCard,
+          );
           break;
         case 'visa':
-          data = await CardService.getVisaCardDetail(widget.card.cardId);
+          data = await CardService.getVisaCardDetail(
+            widget.card.cardId,
+            fallbackCard: fallbackCard,
+          );
           break;
         default:
-          data = await CardService.getDigitalCardDetail(widget.card.cardId);
+          data = await CardService.getDigitalCardDetail(
+            widget.card.cardId,
+            fallbackCard: fallbackCard,
+          );
       }
       if (mounted) {
         setState(() {
@@ -84,6 +94,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
 
   Future<void> _loadFunds() async {
     final amount = double.tryParse(_amountCtrl.text);

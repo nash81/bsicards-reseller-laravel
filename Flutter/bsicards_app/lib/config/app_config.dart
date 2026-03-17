@@ -76,6 +76,12 @@ class AppConfig {
   static const String initiateDepositEndpoint = '/deposit/initiate';
   static const String manualProofEndpoint     = '/deposit/manual-proof';
 
+  static const String withdrawMethodsEndpoint  = '/withdraw/methods';
+  static const String withdrawAccountsEndpoint = '/withdraw/accounts';
+  static const String withdrawDetailsEndpoint  = '/withdraw/details';
+  static const String withdrawInitiateEndpoint = '/withdraw/initiate';
+  static String withdrawStatusEndpoint(String tnx) => '/withdraw/status/$tnx';
+
   static const String notificationsEndpoint   = '/notifications';
   static String markNotificationReadEndpoint(int id) => '/notifications/$id/read';
   static const String markAllNotificationsReadEndpoint = '/notifications/read-all';

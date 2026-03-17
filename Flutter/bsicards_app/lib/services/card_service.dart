@@ -18,13 +18,17 @@ class CardService {
     return {'cards': cards, 'pending': pending};
   }
 
-  static Future<Map<String, dynamic>> getMasterCardDetail(String cardId) async {
+  static Future<Map<String, dynamic>> getMasterCardDetail(
+    String cardId, {
+    VirtualCard? fallbackCard,
+  }) async {
     final data = await ApiService.get('${AppConfig.masterCardsEndpoint}/$cardId');
     final cardJson = _parseCardDetail(data);
+    final detailCard = cardJson != null
+        ? VirtualCard.fromJson(cardJson, type: 'master')
+        : null;
     return {
-      'card': cardJson != null
-          ? VirtualCard.fromJson(cardJson, type: 'master')
-          : null,
+      'card': _mergeCard(detailCard, fallbackCard),
       'transactions': _parseTransactions(data['transactions']),
     };
   }
@@ -59,13 +63,17 @@ class CardService {
     return {'cards': cards, 'pending': pending};
   }
 
-  static Future<Map<String, dynamic>> getVisaCardDetail(String cardId) async {
+  static Future<Map<String, dynamic>> getVisaCardDetail(
+    String cardId, {
+    VirtualCard? fallbackCard,
+  }) async {
     final data = await ApiService.get('${AppConfig.visaCardsEndpoint}/$cardId');
     final cardJson = _parseCardDetail(data);
+    final detailCard = cardJson != null
+        ? VirtualCard.fromJson(cardJson, type: 'visa')
+        : null;
     return {
-      'card': cardJson != null
-          ? VirtualCard.fromJson(cardJson, type: 'visa')
-          : null,
+      'card': _mergeCard(detailCard, fallbackCard),
       'transactions': _parseTransactions(data['transactions']),
     };
   }
@@ -125,7 +133,10 @@ class CardService {
     return _parseCardList(data['cards'], 'digital');
   }
 
-  static Future<Map<String, dynamic>> getDigitalCardDetail(String cardId) async {
+  static Future<Map<String, dynamic>> getDigitalCardDetail(
+    String cardId, {
+    VirtualCard? fallbackCard,
+  }) async {
     final data = await ApiService.get('${AppConfig.digitalCardsEndpoint}/$cardId');
     final cardJson = _parseCardDetail(data);
     final mergedCard = <String, dynamic>{
@@ -140,10 +151,12 @@ class CardService {
       mergedCard['addon'] = addonRaw;
     }
 
+    final detailCard = mergedCard.isNotEmpty
+        ? VirtualCard.fromJson(mergedCard, type: 'digital')
+        : null;
+
     return {
-      'card': mergedCard.isNotEmpty
-          ? VirtualCard.fromJson(mergedCard, type: 'digital')
-          : null,
+      'card': _mergeCard(detailCard, fallbackCard),
       'transactions': _parseTransactions(data['transactions'] ?? mergedCard['transactions']),
       'deposits': _parseList(data['deposits'] ?? mergedCard['deposits']),
       'points': _parseList(data['points'] ?? mergedCard['points']),
@@ -350,6 +363,53 @@ class CardService {
     }
 
     return [];
+  }
+
+  static VirtualCard? _mergeCard(VirtualCard? detail, VirtualCard? fallback) {
+    if (detail == null) return fallback;
+    if (fallback == null) return detail;
+
+    String pick(String? primary, String? secondary, {required String emptyValue}) {
+      final value = primary?.trim();
+      if (value != null && value.isNotEmpty) return value;
+      final fallbackValue = secondary?.trim();
+      if (fallbackValue != null && fallbackValue.isNotEmpty) return fallbackValue;
+      return emptyValue;
+    }
+
+    String? pickNullable(String? primary, String? secondary) {
+      final value = primary?.trim();
+      if (value != null && value.isNotEmpty) return value;
+      final fallbackValue = secondary?.trim();
+      if (fallbackValue != null && fallbackValue.isNotEmpty) return fallbackValue;
+      return null;
+    }
+
+    return VirtualCard(
+      cardId: pick(detail.cardId, fallback.cardId, emptyValue: ''),
+      userEmail: pick(detail.userEmail, fallback.userEmail, emptyValue: ''),
+      lastFour: pickNullable(detail.lastFour, fallback.lastFour),
+      cardNumber: pickNullable(detail.cardNumber, fallback.cardNumber),
+      cardHolder: pickNullable(detail.cardHolder, fallback.cardHolder),
+      expiryDate: pickNullable(detail.expiryDate, fallback.expiryDate),
+      cvv: pickNullable(detail.cvv, fallback.cvv),
+      status: pickNullable(detail.status, fallback.status),
+      cardType: pickNullable(detail.cardType, fallback.cardType),
+      providerType: pickNullable(detail.providerType, fallback.providerType),
+      balance: detail.balance ?? fallback.balance,
+      billingAddress1: pickNullable(detail.billingAddress1, fallback.billingAddress1),
+      billingCity: pickNullable(detail.billingCity, fallback.billingCity),
+      billingState: pickNullable(detail.billingState, fallback.billingState),
+      billingCountry: pickNullable(detail.billingCountry, fallback.billingCountry),
+      billingZipCode: pickNullable(detail.billingZipCode, fallback.billingZipCode),
+      depositAddresses: detail.depositAddresses.isNotEmpty
+          ? detail.depositAddresses
+          : fallback.depositAddresses,
+      isAddon: detail.isAddon ?? fallback.isAddon,
+      addon: (detail.addon != null && detail.addon!.isNotEmpty)
+          ? detail.addon
+          : fallback.addon,
+    );
   }
 }
 

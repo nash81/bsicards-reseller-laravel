@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CardController;
 use App\Http\Controllers\Api\DepositController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\WithdrawController;
 
 /*
 |--------------------------------------------------------------------------
@@ -66,6 +67,18 @@ Route::prefix('v1')->group(function () {
             Route::post('initiate',               [DepositController::class, 'initiate']);
             Route::post('manual-proof',           [DepositController::class, 'submitManualProof']);
             Route::get('status/{tnx}',            [DepositController::class, 'status']);
+        });
+
+        // Withdrawals
+        Route::prefix('withdraw')->group(function () {
+            Route::get('methods',                 [WithdrawController::class, 'methods']);
+            Route::get('accounts',                [WithdrawController::class, 'accounts']);
+            Route::post('accounts',               [WithdrawController::class, 'createAccount']);
+            Route::post('accounts/{id}',          [WithdrawController::class, 'updateAccount']);
+            Route::delete('accounts/{id}',        [WithdrawController::class, 'deleteAccount']);
+            Route::get('details',                 [WithdrawController::class, 'details']);
+            Route::post('initiate',               [WithdrawController::class, 'initiate']);
+            Route::get('status/{tnx}',            [WithdrawController::class, 'status']);
         });
 
         Route::get('cards/fees', [CardController::class, 'fees']);

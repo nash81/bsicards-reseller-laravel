@@ -176,6 +176,33 @@ class ApiService {
     }
   }
 
+  // ── DELETE ──────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> delete(
+    String path, {
+    Map<String, dynamic>? params,
+    bool auth = true,
+  }) async {
+    final uri = _uri(path, params);
+    final watch = Stopwatch()..start();
+    try {
+      final headers = await _headers(auth: auth);
+      _logRequest('DELETE', uri, headers: headers);
+      final response = await http
+          .delete(uri, headers: headers)
+          .timeout(const Duration(seconds: 30));
+      _logResponse('DELETE', uri, response, watch);
+      return _parse(response);
+    } on SocketException catch (e) {
+      _logFailure('DELETE', uri, e, watch);
+      throw ApiException('No internet connection.');
+    } catch (e) {
+      _logFailure('DELETE', uri, e, watch);
+      throw ApiException(e.toString());
+    } finally {
+      watch.stop();
+    }
+  }
+
   // ── Multipart POST (file upload) ────────────────────────────────────
   static Future<Map<String, dynamic>> postMultipart(
     String path, {

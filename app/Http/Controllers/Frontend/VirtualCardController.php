@@ -1327,4 +1327,334 @@ class VirtualCardController extends Controller {
         notify()->error(__('Addon card request failed. Your balance has been restored.'), 'Error');
         return back();
     }
+
+
+
+    // Reseller Digital Visa Wallet Cards
+    public function resellerDigitalVisaCreateCard(Request $request) {
+        $this->validate($request, [
+            'firstname' => 'required',
+            'lastname' => 'required',
+            'useremail' => 'required|email',
+        ]);
+        $user = auth()->user();
+        $general = GeneralSetting::first();
+        $bsiissue_fee = (float) $general->bsiissue_fee;
+        $bsiload_fee = (float) $general->bsiload_fee;
+        $bsifixed_fee = (float) $general->bsifixed_fee;
+        $base_amount = 5.0;
+        $load_fee = round($base_amount * $bsiload_fee / 100, 2);
+        $total_fee = $bsiissue_fee + $base_amount + $load_fee + $bsifixed_fee;
+        if ($user->balance < $total_fee) {
+            notify()->error(__('Insufficient Balance'), 'Error');
+            return back();
+        }
+        $user->balance -= $total_fee;
+        $user->save();
+        $trx = getTrx();
+        $curl = curl_init();
+        $body = array(
+            'useremail' => $request->useremail,
+            'firstname' => $request->firstname,
+            'lastname' => $request->lastname,
+        );
+        $data = json_encode($body);
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => bsi_merchant_api_url('create-card'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'publickey: ' . $general->bsi_publickey,
+                'secretkey: ' . $general->bsi_secretkey,
+                'Content-Type: application/json'
+            ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $result = json_decode($response);
+        if (isset($result->code) && $result->code == 201) {
+            // Only create transaction if card issuance is successful
+            $transaction = new Transaction();
+            $transaction->user_id = $user->id;
+            $transaction->amount = $total_fee;
+            $transaction->final_amount = $total_fee;
+            $transaction->charge = $load_fee + $bsifixed_fee;
+            $transaction->type = 'subtract';
+            $transaction->description = 'Reseller Digital Visa Wallet Card Fees';
+            $transaction->tnx = $trx;
+            $transaction->status = 'success';
+            $transaction->save();
+            notify()->success(__('Digital Visa Wallet Card Created Successfully'), 'Success');
+            return back();
+        } else {
+            $user->balance += $total_fee;
+            $user->save();
+            notify()->error(__('Error issuing new card, Try Again Later'), 'Error');
+            return back();
+        }
+    }
+
+    public function resellerDigitalVisaGetAllCards(Request $request) {
+        $user = auth()->user();
+        $general = GeneralSetting::first();
+        $curl = curl_init();
+        $body = array(
+            'useremail' => $user->email,
+        );
+        $data = json_encode($body);
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => bsi_merchant_api_url('getalldigitalvisa'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'publickey: ' . $general->bsi_publickey,
+                'secretkey: ' . $general->bsi_secretkey,
+                'Content-Type: application/json'
+            ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $cards = json_decode($response);
+        if (isset($cards->code) && $cards->code == 200) {
+            return view('frontend.default.user.virtualcard.resellerdigitalvisa', compact('cards', 'user', 'general'));
+        } else {
+            notify()->error(__('Error Fetching Cards, Try Again Later'), 'Error');
+            return back();
+        }
+    }
+
+    public function resellerDigitalVisaGetCard(Request $request) {
+        $user = auth()->user();
+        $general = GeneralSetting::first();
+        $this->validate($request, [
+            'cardid' => 'required',
+        ]);
+        $curl = curl_init();
+        $body = array(
+            'useremail' => $user->email,
+            'cardid' => $request->cardid,
+        );
+        $data = json_encode($body);
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => bsi_merchant_api_url('getdigitalvisa'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'publickey: ' . $general->bsi_publickey,
+                'secretkey: ' . $general->bsi_secretkey,
+                'Content-Type: application/json'
+            ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $card = json_decode($response);
+        if (isset($card->code) && $card->code == 200) {
+            return view('frontend.default.user.virtualcard.resellerdigitalvisashow', compact('card', 'user', 'general'));
+        } else {
+            notify()->error(__('Error Fetching Card Details'), 'Error');
+            return back();
+        }
+    }
+
+    public function resellerDigitalVisaFundCard(Request $request) {
+        $user = auth()->user();
+        $general = GeneralSetting::first();
+        $this->validate($request, [
+            'cardid' => 'required',
+            'amount' => 'required|numeric|gt:4',
+        ]);
+        $bsiload_fee = (float) $general->bsiload_fee;
+        $bsifixed_fee = (float) $general->bsifixed_fee;
+        $fee = round($request->amount * $bsiload_fee / 100, 2) + $bsifixed_fee;
+        $totalamount = $request->amount + $fee;
+        if ($user->balance < $totalamount) {
+            notify()->error(__('Insufficient Balance'), 'Error');
+            return back();
+        }
+        $user->balance -= $totalamount;
+        $user->save();
+        $trx = getTrx();
+        $transaction = new Transaction();
+        $transaction->user_id = $user->id;
+        $transaction->amount = $totalamount;
+        $transaction->final_amount = $totalamount;
+        $transaction->charge = $fee;
+        $transaction->type = 'subtract';
+        $transaction->description = 'Funded Reseller Digital Visa Wallet Card ' . $request->cardid;
+        $transaction->tnx = $trx;
+        $transaction->status = 'success';
+        $transaction->save();
+        $curl = curl_init();
+        $body = array(
+            'useremail' => $user->email,
+            'cardid' => $request->cardid,
+            'amount' => $request->amount,
+        );
+        $data = json_encode($body);
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => bsi_merchant_api_url('fund-card'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'publickey: ' . $general->bsi_publickey,
+                'secretkey: ' . $general->bsi_secretkey,
+                'Content-Type: application/json'
+            ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $result = json_decode($response);
+        if (isset($result->code) && $result->code == 200) {
+            notify()->success(__('Fund Load Request Successful'), 'Success');
+            return back();
+        } else {
+            $user->balance += $totalamount;
+            $user->save();
+            notify()->error(__('Fund Load Request Failed'), 'Error');
+            return back();
+        }
+    }
+
+    public function resellerDigitalVisaGetOtp(Request $request) {
+        $user = auth()->user();
+        $general = GeneralSetting::first();
+        $this->validate($request, [
+            'cardid' => 'required',
+        ]);
+        $curl = curl_init();
+        $body = array(
+            'useremail' => $user->email,
+            'cardid' => $request->cardid,
+        );
+        $data = json_encode($body);
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => bsi_merchant_api_url('get-otp'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'publickey: ' . $general->bsi_publickey,
+                'secretkey: ' . $general->bsi_secretkey,
+                'Content-Type: application/json'
+            ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $otp = json_decode($response);
+        if (isset($otp->code) && $otp->code == 200) {
+            return response()->json(['otp' => $otp->data->otp ?? null]);
+        } else {
+            notify()->error(__('Error Fetching OTP'), 'Error');
+            return back();
+        }
+    }
+
+    public function resellerDigitalVisaBlockCard(Request $request) {
+        $user = auth()->user();
+        $general = GeneralSetting::first();
+        $this->validate($request, [
+            'cardid' => 'required',
+        ]);
+        $curl = curl_init();
+        $body = array(
+            'useremail' => $user->email,
+            'cardid' => $request->cardid,
+        );
+        $data = json_encode($body);
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => bsi_merchant_api_url('block-card'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'publickey: ' . $general->bsi_publickey,
+                'secretkey: ' . $general->bsi_secretkey,
+                'Content-Type: application/json'
+            ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $result = json_decode($response);
+        if (isset($result->code) && $result->code == 200) {
+            notify()->success(__('Card Blocked Successfully'), 'Success');
+            return back();
+        } else {
+            notify()->error(__('Error Blocking Card'), 'Error');
+            return back();
+        }
+    }
+
+    public function resellerDigitalVisaUnblockCard(Request $request) {
+        $user = auth()->user();
+        $general = GeneralSetting::first();
+        $this->validate($request, [
+            'cardid' => 'required',
+        ]);
+        $curl = curl_init();
+        $body = array(
+            'useremail' => $user->email,
+            'cardid' => $request->cardid,
+        );
+        $data = json_encode($body);
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => bsi_merchant_api_url('unblock-card'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'publickey: ' . $general->bsi_publickey,
+                'secretkey: ' . $general->bsi_secretkey,
+                'Content-Type: application/json'
+            ),
+        ));
+        $response = curl_exec($curl);
+        curl_close($curl);
+        $result = json_decode($response);
+        if (isset($result->code) && $result->code == 200) {
+            notify()->success(__('Card Unblocked Successfully'), 'Success');
+            return back();
+        } else {
+            notify()->error(__('Error Unblocking Card'), 'Error');
+            return back();
+        }
+    }
 }

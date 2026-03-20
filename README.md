@@ -155,6 +155,14 @@ Type `yes` and press Enter to proceed.
 
 This will add the `bsifixed_fee` column to the `general_settings` table.
 
+## Running Seeders
+
+To seed the Digital VisaCard navigation item, run:
+
+```bash
+php artisan db:seed --class=UserNavigationDigitalVisaSeeder
+```
+
 ## Troubleshooting
 
 ### Database connection failed

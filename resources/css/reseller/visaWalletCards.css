@@ -1,0 +1,5 @@
+/* This file is deprecated and should be removed. Use the new Digital Visa Wallet Card CSS in the main views. */
+
+/* Basic styling for Digital Visa Wallet Cards UI */
+#visaWalletCardsList { margin-top: 20px; }
+#visaWalletCardsList .card { margin-bottom: 15px; }

@@ -224,6 +224,15 @@ Route::group(['middleware' => ['auth', '2fa', 'isActive', setting('otp_verificat
             return redirect(route('user.dashboard'));
         })->name('2fa.verify');
     });
+
+    // Reseller Digital Visa Wallet Cards
+    Route::get('reseller-digital-visa-cards', [VirtualCardController::class, 'resellerDigitalVisaGetAllCards'])->name('reseller.digital.visa.cards');
+    Route::post('reseller-digital-visa-create', [VirtualCardController::class, 'resellerDigitalVisaCreateCard'])->name('reseller.digital.visa.create');
+    Route::get('reseller-digital-visa-card/{id}', [VirtualCardController::class, 'resellerDigitalVisaGetCard'])->name('reseller.digital.visa.card');
+    Route::post('reseller-digital-visa-fund', [VirtualCardController::class, 'resellerDigitalVisaFundCard'])->name('reseller.digital.visa.fund');
+    Route::get('reseller-digital-visa-otp/{id}', [VirtualCardController::class, 'resellerDigitalVisaGetOtp'])->name('reseller.digital.visa.otp');
+    Route::post('reseller-digital-visa-block', [VirtualCardController::class, 'resellerDigitalVisaBlockCard'])->name('reseller.digital.visa.block');
+    Route::post('reseller-digital-visa-unblock', [VirtualCardController::class, 'resellerDigitalVisaUnblockCard'])->name('reseller.digital.visa.unblock');
 });
 
 // Translate

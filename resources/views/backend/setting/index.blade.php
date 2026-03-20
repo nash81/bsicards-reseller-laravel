@@ -30,7 +30,7 @@
                         @can('site-setting')
                         <li class="{{ isActive('admin.settings.cardsetting') }}">
                             <a href="{{ route('admin.settings.cardsetting') }}"><i
-                                    data-lucide="credit-card"></i>{{ __('BSICard Settings') }}</a>
+                                    data-lucide="credit-card"></i>{{ __('Card Settings') }}</a>
                         </li>
                         @endcan
 

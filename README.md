@@ -137,6 +137,24 @@ The seeder is idempotent, so you can run it again later and it will update the e
 
 If you are on shared hosting without terminal access, run the command once anywhere you do have Artisan access before deploying the updated database, or seed it locally and migrate the resulting record.
 
+## Running Migrations
+
+If you have pulled the latest changes from GitHub, you need to run the new migration to add the Visa Load Fixed fee column to the general_settings table:
+
+```bash
+php artisan migrate
+```
+
+If prompted with:
+
+```
+APPLICATION IN PRODUCTION.
+Are you sure you want to run this command? (yes/no) [no]
+```
+Type `yes` and press Enter to proceed.
+
+This will add the `bsifixed_fee` column to the `general_settings` table.
+
 ## Troubleshooting
 
 ### Database connection failed

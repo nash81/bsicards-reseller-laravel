@@ -59,6 +59,7 @@ class SettingController extends Controller {
         $general->bsi_publickey = $request->bsi_publickey;
         $general->bsi_secretkey = $request->bsi_secretkey;
         $general->bsi_resellerkey = $request->bsi_resellerkey;
+        $general->bsifixed_fee = $request->bsifixed_fee;
         $general->save();
 
         notify()->success(__('Virtual Card Details Updated'));

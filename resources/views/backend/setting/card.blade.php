@@ -75,7 +75,7 @@
                             <div class="col-xl-4 col-lg-4 col-md-4 col-sm-12">
                                 <div class="site-input-groups">
                                     <label for=""
-                                           class="box-input-label col-label">{{ __('BSI Issue Fees $') }}</label>
+                                           class="box-input-label col-label">{{ __('Visa Issue Fees $') }}</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -89,7 +89,7 @@
                             <div class="col-xl-4 col-lg-4 col-md-4 col-sm-12">
                                 <div class="site-input-groups">
                                     <label for=""
-                                           class="box-input-label col-label">{{ __('BSI Load Fees %') }}</label>
+                                           class="box-input-label col-label">{{ __('Visa Load Fees %') }}</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -97,6 +97,19 @@
                                         name="bsiload_fee"
                                         value="{{ $general->bsiload_fee }}"
                                         required
+                                        />
+                                </div>
+                            </div>
+                            <div class="col-xl-4 col-lg-4 col-md-4 col-sm-12">
+                                <div class="site-input-groups">
+                                    <label for=""
+                                           class="box-input-label col-label">{{ __('Visa Load Fixed $') }}</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        class="box-input"
+                                        name="bsifixed_fee"
+                                        value="{{ $general->bsifixed_fee ?? '' }}"
                                         />
                                 </div>
                             </div>

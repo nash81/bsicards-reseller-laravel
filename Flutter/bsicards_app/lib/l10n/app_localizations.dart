@@ -315,6 +315,7 @@ class AppLocalizations {
       'theme_ocean_tribe_desc': 'Cool blue tones',
       'theme_black_tiger_desc': 'Dark gold Binance style',
       'theme_mysterious_elegance_desc': 'Light indigo with clean whites',
+      'apply_digital_visa': 'Apply for Digital Visa',
     },
     'es': {
       'home': 'Inicio',
@@ -364,6 +365,7 @@ class AppLocalizations {
       'card_number_unavailable': 'Numero de tarjeta no disponible',
       'card_number_copied': 'Numero de tarjeta copiado!',
       'wallet_otp': 'OTP de billetera',
+      'apply_digital_visa': 'Solicitar Visa Digital',
     },
     'fr': {
       'home': 'Accueil',
@@ -413,6 +415,7 @@ class AppLocalizations {
       'card_number_unavailable': 'Numero de carte indisponible',
       'card_number_copied': 'Numero de carte copie!',
       'wallet_otp': 'OTP portefeuille',
+      'apply_digital_visa': 'Demander une Visa Digitale',
     },
     'nl': {
       'home': 'Home',

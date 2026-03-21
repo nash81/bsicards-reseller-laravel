@@ -1435,16 +1435,14 @@ class VirtualCardController extends Controller {
         }
     }
 
-    public function resellerDigitalVisaGetCard(Request $request) {
+    public function resellerDigitalVisaGetCard(Request $request, string $cardid) {
         $user = auth()->user();
         $general = GeneralSetting::first();
-        $this->validate($request, [
-            'cardid' => 'required',
-        ]);
+
         $curl = curl_init();
         $body = array(
             'useremail' => $user->email,
-            'cardid' => $request->cardid,
+            'cardid' => $cardid,
         );
         $data = json_encode($body);
         curl_setopt_array($curl, array(
@@ -1465,6 +1463,7 @@ class VirtualCardController extends Controller {
         ));
         $response = curl_exec($curl);
         curl_close($curl);
+
         $card = json_decode($response);
         if (isset($card->code) && $card->code == 200) {
             return view('frontend.default.user.virtualcard.resellerdigitalvisashow', compact('card', 'user', 'general'));

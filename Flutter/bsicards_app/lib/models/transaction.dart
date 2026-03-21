@@ -46,6 +46,23 @@ class Transaction {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'tnx': tnx,
+      'type': type,
+      'description': description,
+      'method': method,
+      'amount': amount,
+      'charge': charge,
+      'final_amount': finalAmount,
+      'pay_currency': payCurrency,
+      'pay_amount': payAmount,
+      'status': status,
+      'created_at': createdAt,
+    };
+  }
+
   bool get isCredit =>
       type == 'deposit' || type == 'manual_deposit' ||
       type == 'signup_bonus' || type == 'referral' || type == 'receive_money';

@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../l10n/app_localizations.dart';
 import '../models/virtual_card.dart';
 import '../config/app_theme.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class CardWidget extends StatelessWidget {
   final VirtualCard card;
@@ -27,14 +28,22 @@ class CardWidget extends StatelessWidget {
         height: compact ? 120 : 200,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [card.cardGradientStart, card.cardGradientEnd],
-          ),
+          gradient: card.cardType == 'digitalvisa'
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFF1A237E), const Color(0xFF3949AB)],
+                )
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [card.cardGradientStart, card.cardGradientEnd],
+                ),
           boxShadow: [
             BoxShadow(
-              color: card.cardGradientStart.withValues(alpha: 0.4),
+              color: (card.cardType == 'digitalvisa'
+                  ? const Color(0xFF1A237E)
+                  : card.cardGradientStart).withValues(alpha: 0.4),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -236,13 +245,15 @@ class CardWidget extends StatelessWidget {
   }
 
   Widget _networkLogo() {
-    if (card.cardType == 'visa') {
-      return const Text('VISA',
-          style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              fontStyle: FontStyle.italic));
+    if (card.cardType == 'visa' || card.cardType == 'digitalvisa') {
+      return SizedBox(
+        width: 48,
+        height: 28,
+        child: SvgPicture.asset(
+          'assets/images/visa_logo.svg',
+          fit: BoxFit.contain,
+        ),
+      );
     }
     // Mastercard circles
     return SizedBox(

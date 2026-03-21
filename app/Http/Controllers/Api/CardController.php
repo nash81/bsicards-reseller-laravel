@@ -23,6 +23,7 @@ class CardController extends Controller
             'data'   => [
                 'bsiissue_fee' => (float) ($general->bsiissue_fee ?? 0),
                 'bsiload_fee'  => (float) ($general->bsiload_fee ?? 0),
+                'bsifixed_fee'  => (float) ($general->bsifixed_fee ?? 0),
                 'digifee'      => (float) ($general->digifee ?? 0),
             ],
         ]);
@@ -230,330 +231,7 @@ class CardController extends Controller
         return $decoded;
     }
 
-    // =======================================================
-    // MASTERCARD
-    // =======================================================
 
-    public function masterList(Request $request)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-
-        $cards   = $this->bsiCall('getallcard', ['useremail' => $user->email], $general);
-        $pending = $this->bsiCall('getpendingcards', ['useremail' => $user->email], $general);
-
-        return response()->json([
-            'status'  => true,
-            'cards'   => $this->extractList($cards,   'getallcard'),
-            'pending' => $this->extractList($pending, 'getpendingcards'),
-        ]);
-    }
-
-    public function masterView(Request $request, string $cardId)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-
-        $card  = $this->bsiCall('getcard', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-        $trans = $this->bsiCall('getcardtransactions', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-
-        if (! isset($card->code) || $card->code != 200) {
-            return response()->json(['status' => false, 'message' => 'Card not found.'], 404);
-        }
-
-        return response()->json([
-            'status'       => true,
-            'card'         => $card->data ?? $card,
-            'transactions' => $trans->data ?? [],
-        ]);
-    }
-
-    public function masterLoadFunds(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'cardid' => 'required|string',
-            'amount' => 'required|numeric|min:10',
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['status' => false, 'message' => $validator->errors()->first()], 422);
-        }
-
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $fee     = round($request->amount * $general->bsiload_fee / 100, 2);
-        $total   = $request->amount + $fee;
-
-        if ($user->balance < $total) {
-            return response()->json(['status' => false, 'message' => 'Insufficient balance.'], 422);
-        }
-
-        $user->balance -= $total;
-        $user->save();
-
-        $result = $this->bsiCall('fundcard', [
-            'useremail' => $user->email,
-            'cardid'    => $request->cardid,
-            'amount'    => $request->amount,
-        ], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            Txn::new($total, $fee, $total, 'BSICards', 'MasterCard Loaded for ' . $user->email, TxnType::Subtract, TxnStatus::Success, null, null, $user->id);
-            return response()->json(['status' => true, 'message' => 'Funds loaded successfully.']);
-        }
-
-        $user->balance += $total;
-        $user->save();
-        return response()->json(['status' => false, 'message' => 'Failed to load funds. Please try again.'], 500);
-    }
-
-    public function masterApply(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'pin' => 'required|numeric',
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['status' => false, 'message' => $validator->errors()->first()], 422);
-        }
-
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $baseAmount = 10;
-        $fee        = (float) ($general->bsiissue_fee ?? 0);
-        $total      = $baseAmount + $fee;
-
-        if ($user->balance < $total) {
-            return response()->json(['status' => false, 'message' => 'Insufficient balance.'], 422);
-        }
-
-        $user->balance -= $total;
-        $user->save();
-
-        $result = $this->bsiCall('newcard', [
-            'useremail'  => $user->email,
-            'nameoncard' => trim($user->first_name . ' ' . $user->last_name),
-            'pin'        => $request->pin,
-        ], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            Txn::new($total, $fee, $total, 'BSICards', 'New Mastercard Fees', TxnType::Subtract, TxnStatus::Success, null, null, $user->id);
-            return response()->json([
-                'status'  => true,
-                'message' => 'New Mastercard requested. Please allow 24-48 hours.',
-                'data'    => $result->data ?? null,
-            ]);
-        }
-
-        $user->balance += $total;
-        $user->save();
-        return response()->json(['status' => false, 'message' => $result->message ?? 'Error requesting new card.'], 500);
-    }
-
-    public function masterBlock(Request $request, string $cardId)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $result  = $this->bsiCall('blockcard', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            return response()->json(['status' => true, 'message' => 'Card blocked successfully.']);
-        }
-        return response()->json(['status' => false, 'message' => 'Failed to block card.'], 500);
-    }
-
-    public function masterUnblock(Request $request, string $cardId)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $result  = $this->bsiCall('unblockcard', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            return response()->json(['status' => true, 'message' => 'Card unblock requested.']);
-        }
-        return response()->json(['status' => false, 'message' => 'Failed to unblock card.'], 500);
-    }
-
-    // =======================================================
-    // VISA CARD
-    // =======================================================
-
-    public function visaList(Request $request)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-
-        $cards   = $this->bsiCall('visagetallcard',      ['useremail' => $user->email], $general);
-        $pending = $this->bsiCall('visagetpendingcards', ['useremail' => $user->email], $general);
-
-        return response()->json([
-            'status'  => true,
-            'cards'   => $this->extractList($cards,   'visagetallcard'),
-            'pending' => $this->extractList($pending, 'visagetpendingcards'),
-        ]);
-    }
-
-    public function visaView(Request $request, string $cardId)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-
-        $card  = $this->bsiCall('visagetcard', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-        $trans = $this->bsiCall('visagetcardtransactions', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-
-        if (! isset($card->code) || $card->code != 200) {
-            return response()->json(['status' => false, 'message' => 'Card not found.'], 404);
-        }
-
-        return response()->json([
-            'status'       => true,
-            'card'         => $card->data ?? $card,
-            'transactions' => $trans->data ?? [],
-        ]);
-    }
-
-    public function visaLoadFunds(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'cardid' => 'required|string',
-            'amount' => 'required|numeric|min:10',
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['status' => false, 'message' => $validator->errors()->first()], 422);
-        }
-
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $fee     = round($request->amount * ($general->bsiload_fee ?? 0) / 100, 2);
-        $total   = $request->amount + $fee;
-
-        if ($user->balance < $total) {
-            return response()->json(['status' => false, 'message' => 'Insufficient balance.'], 422);
-        }
-
-        $user->balance -= $total;
-        $user->save();
-
-        $result = $this->bsiCall('visafundcard', [
-            'useremail' => $user->email,
-            'cardid'    => $request->cardid,
-            'amount'    => $request->amount,
-        ], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            Txn::new($total, $fee, $total, 'BSICards', 'VisaCard Loaded for ' . $user->email, TxnType::Subtract, TxnStatus::Success, null, null, $user->id);
-            return response()->json(['status' => true, 'message' => 'Visa card funded successfully.']);
-        }
-
-        $user->balance += $total;
-        $user->save();
-        return response()->json(['status' => false, 'message' => 'Failed to load funds.'], 500);
-    }
-
-    public function visaApply(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'pin'              => 'required|numeric',
-            'dob'              => 'required|string',
-            'nationalidnumber' => 'required|string',
-            'userphoto'        => 'nullable',
-            'nationalidimage'  => 'nullable',
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['status' => false, 'message' => $validator->errors()->first()], 422);
-        }
-
-        $fileValidator = Validator::make($request->all(), [
-            'userphoto'       => 'nullable|file|mimes:jpg,jpeg,png|max:4096',
-            'nationalidimage' => 'nullable|file|mimes:jpg,jpeg,png|max:4096',
-        ]);
-        if ($fileValidator->fails()) {
-            return response()->json(['status' => false, 'message' => $fileValidator->errors()->first()], 422);
-        }
-
-        $userPhotoUrl = $request->input('userphoto');
-        $nationalIdImageUrl = $request->input('nationalidimage');
-
-        if ($request->hasFile('userphoto')) {
-            $path = $request->file('userphoto')->store('images', 'public');
-            $userPhotoUrl = Storage::disk('public')->url($path);
-        }
-
-        if ($request->hasFile('nationalidimage')) {
-            $path = $request->file('nationalidimage')->store('images', 'public');
-            $nationalIdImageUrl = Storage::disk('public')->url($path);
-        }
-
-        if (empty($userPhotoUrl) || empty($nationalIdImageUrl)) {
-            return response()->json(['status' => false, 'message' => 'Both user photo and national ID image are required.'], 422);
-        }
-
-        if (! $request->hasFile('userphoto') && ! filter_var($userPhotoUrl, FILTER_VALIDATE_URL)) {
-            return response()->json(['status' => false, 'message' => 'User photo must be a valid URL or image file.'], 422);
-        }
-
-        if (! $request->hasFile('nationalidimage') && ! filter_var($nationalIdImageUrl, FILTER_VALIDATE_URL)) {
-            return response()->json(['status' => false, 'message' => 'National ID image must be a valid URL or image file.'], 422);
-        }
-
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $baseAmount = 10;
-        $fee        = (float) ($general->bsiissue_fee ?? 0);
-        $total      = $baseAmount + $fee;
-
-        if ($user->balance < $total) {
-            return response()->json(['status' => false, 'message' => 'Insufficient balance.'], 422);
-        }
-
-        $user->balance -= $total;
-        $user->save();
-
-        $result = $this->bsiCall('visanewcard', [
-            'useremail'        => $user->email,
-            'nameoncard'       => trim($user->first_name . ' ' . $user->last_name),
-            'pin'              => $request->pin,
-            'dob'              => $request->dob,
-            'userphoto'        => $userPhotoUrl,
-            'nationalidimage'  => $nationalIdImageUrl,
-            'nationalidnumber' => $request->nationalidnumber,
-        ], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            Txn::new($total, $fee, $total, 'BSICards', 'New Visacard Fees', TxnType::Subtract, TxnStatus::Success, null, null, $user->id);
-            return response()->json([
-                'status'  => true,
-                'message' => 'New Visa card requested. Please allow 24-48 hours.',
-                'data'    => $result->data ?? null,
-            ]);
-        }
-
-        $user->balance += $total;
-        $user->save();
-        return response()->json(['status' => false, 'message' => $result->message ?? 'Error requesting new card.'], 500);
-    }
-
-    public function visaBlock(Request $request, string $cardId)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $result  = $this->bsiCall('visablockcard', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            return response()->json(['status' => true, 'message' => 'Visa card blocked.']);
-        }
-        return response()->json(['status' => false, 'message' => 'Failed to block card.'], 500);
-    }
-
-    public function visaUnblock(Request $request, string $cardId)
-    {
-        $user    = $request->user();
-        $general = GeneralSetting::first();
-        $result  = $this->bsiCall('visaunblockcard', ['useremail' => $user->email, 'cardid' => $cardId], $general);
-
-        if (isset($result->code) && $result->code == 200) {
-            return response()->json(['status' => true, 'message' => 'Visa card unblock requested.']);
-        }
-        return response()->json(['status' => false, 'message' => 'Failed to unblock card.'], 500);
-    }
 
     // =======================================================
     // DIGITAL MASTERCARD
@@ -820,5 +498,115 @@ class CardController extends Controller
         }
         return response()->json(['status' => false, 'message' => '3DS approval failed.'], 500);
     }
-}
 
+    // =======================================================
+    // DIGITAL VISA WALLET CARDS
+    // =======================================================
+
+    public function digitalvisaList(Request $request) {
+        $user = $request->user();
+        $general = GeneralSetting::first();
+        $cards = $this->bsiCall('getalldigitalvisa', ['useremail' => $user->email], $general);
+        return response()->json(['status' => true, 'data' => $this->extractList($cards, 'getalldigitalvisa')]);
+    }
+
+    public function digitalvisaView(Request $request, string $cardId) {
+        $user = $request->user();
+        $general = GeneralSetting::first();
+        $card = $this->bsiCall('getdigitalvisa', ['useremail' => $user->email, 'cardid' => $cardId], $general);
+
+        return response()->json(['status' => true, 'data' => $card->data ?? null]);
+    }
+
+    public function digitalvisaLoadFunds(Request $request) {
+        $validator = Validator::make($request->all(), ['cardid' => 'required|string', 'amount' => 'required|numeric|gt:4']);
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'message' => $validator->errors()->first()], 422);
+        }
+        $user = $request->user();
+        $general = GeneralSetting::first();
+        $bsiload_fee = (float) $general->bsiload_fee;
+        $bsifixed_fee = (float) $general->bsifixed_fee;
+        $fee = round($request->amount * $bsiload_fee / 100, 2) + $bsifixed_fee;
+        $totalamount = $request->amount + $fee;
+        if ($user->balance < $totalamount) {
+            return response()->json(['status' => false, 'message' => 'Insufficient balance.'], 422);
+        }
+        $user->balance -= $totalamount;
+        $user->save();
+        $result = $this->bsiCall('fund-card', [
+            'useremail' => $user->email,
+            'cardid' => $request->cardid,
+            'amount' => $request->amount
+        ], $general);
+        if (isset($result->code) && $result->code == 200) {
+            Txn::new($totalamount, $fee, $totalamount, 'BSICards', 'Funded Reseller Digital Visa Wallet Card ' . $request->cardid, TxnType::Subtract, TxnStatus::Success, null, null, $user->id);
+            return response()->json(['status' => true, 'message' => 'Funds loaded successfully.', 'data' => $result->data ?? null]);
+        }
+        $user->balance += $totalamount;
+        $user->save();
+        return response()->json(['status' => false, 'message' => $result->message ?? 'Failed to load funds.'], 500);
+    }
+
+    public function digitalvisaBlock(Request $request, string $cardId) {
+        $user = $request->user();
+        $general = GeneralSetting::first();
+        $result = $this->bsiCall('block-card', ['useremail' => $user->email, 'cardid' => $cardId], $general);
+        return response()->json(['status' => true, 'data' => $result->data ?? null]);
+    }
+
+    public function digitalvisaUnblock(Request $request, string $cardId) {
+        $user = $request->user();
+        $general = GeneralSetting::first();
+        $result = $this->bsiCall('unblock-card', ['useremail' => $user->email, 'cardid' => $cardId], $general);
+        return response()->json(['status' => true, 'data' => $result->data ?? null]);
+    }
+
+    public function digitalvisaApply(Request $request) {
+        $validator = Validator::make($request->all(), ['firstname' => 'required|string', 'lastname' => 'required|string', 'useremail' => 'required|email']);
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'message' => $validator->errors()->first()], 422);
+        }
+        $user = $request->user();
+        $general = GeneralSetting::first();
+        $bsiissue_fee = (float) $general->bsiissue_fee;
+        $bsiload_fee = (float) $general->bsiload_fee;
+        $bsifixed_fee = (float) $general->bsifixed_fee;
+        $base_amount = 5.0;
+        $load_fee = round($base_amount * $bsiload_fee / 100, 2);
+        $total_fee = $bsiissue_fee + $base_amount + $load_fee + $bsifixed_fee;
+        if ($user->balance < $total_fee) {
+            return response()->json(['status' => false, 'message' => 'Insufficient balance.'], 422);
+        }
+        $user->balance -= $total_fee;
+        $user->save();
+        $result = $this->bsiCall('create-card', [
+            'useremail' => $request->useremail,
+            'firstname' => $request->firstname,
+            'lastname' => $request->lastname
+        ], $general);
+        if (isset($result->code) && $result->code == 201) {
+            Txn::new($total_fee, $load_fee + $bsifixed_fee, $total_fee, 'BSICards', 'Reseller Digital Visa Wallet Card Fees', TxnType::Subtract, TxnStatus::Success, null, null, $user->id);
+            return response()->json(['status' => true, 'message' => 'Digital Visa Wallet Card Created Successfully', 'data' => $result->data ?? null]);
+        }
+        $user->balance += $total_fee;
+        $user->save();
+        return response()->json(['status' => false, 'message' => $result->message ?? 'Error issuing new card, Try Again Later'], 500);
+    }
+
+
+
+    public function digitalvisaCheckOtp(Request $request, string $cardId) {
+
+        $user = $request->user();
+        $general = GeneralSetting::first();
+        $result = $this->bsiCall('get-otp', [
+            'useremail' => $user->email,
+            'cardid' => $cardId
+        ], $general);
+        if (isset($result->code) && $result->code == 200) {
+            return response()->json(['otp' => $result->data->otp ?? null]);
+        }
+        return response()->json(['status' => false, 'message' => 'Error Fetching OTP'], 404);
+    }
+}

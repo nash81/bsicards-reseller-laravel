@@ -83,34 +83,13 @@ Route::prefix('v1')->group(function () {
 
         Route::get('cards/fees', [CardController::class, 'fees']);
 
-        // Virtual Cards – MasterCard
-        Route::prefix('cards/master')->group(function () {
-            Route::get('/',                       [CardController::class, 'masterList']);
-            Route::post('apply',                  [CardController::class, 'masterApply']);
-            Route::get('{cardId}',                [CardController::class, 'masterView']);
-            Route::post('load',                   [CardController::class, 'masterLoadFunds']);
-            Route::post('{cardId}/block',         [CardController::class, 'masterBlock']);
-            Route::post('{cardId}/unblock',       [CardController::class, 'masterUnblock']);
-        });
 
-        // Virtual Cards – Visa
 /**
  * Define routes for card operations
  * This function sets up various endpoints for managing card-related functionalities
  * including listing, viewing, loading funds, and blocking/unblocking cards
  */
-        Route::prefix('cards/visa')->group(function () {
-            // Route for displaying the list of all Visa cards
-            Route::get('/',                       [CardController::class, 'visaList']);
-            Route::post('apply',                  [CardController::class, 'visaApply']);
-            // Route for displaying details of a specific card by its ID
-            Route::get('{cardId}',                [CardController::class, 'visaView']);
-            // Route for loading funds onto a card
-            Route::post('load',                   [CardController::class, 'visaLoadFunds']);
-            // Route for blocking a specific card by its ID
-            Route::post('{cardId}/block',         [CardController::class, 'visaBlock']);
-            Route::post('{cardId}/unblock',       [CardController::class, 'visaUnblock']);
-        });
+
 
         // Virtual Cards – Digital Mastercard
         Route::prefix('cards/digital')->group(function () {
@@ -124,6 +103,18 @@ Route::prefix('v1')->group(function () {
             Route::get('{cardId}/check-3ds',      [CardController::class, 'check3ds']);
             Route::post('{cardId}/approve-3ds',   [CardController::class, 'approve3ds']);
             Route::get('{cardId}/wallet-otp',     [CardController::class, 'checkWalletOtp']);
+        });
+
+        // Virtual Cards – Digital Visa Wallet
+        Route::prefix('cards/digitalvisa')->group(function () {
+            Route::get('/',                       [CardController::class, 'digitalvisaList']);
+            Route::post('apply',                  [CardController::class, 'digitalvisaApply']);
+            // Changed endpoint for Digital Visa Wallet card details
+            Route::get('digitalvisagetcard/{cardId}', [CardController::class, 'digitalvisaView']);
+            Route::post('load',                   [CardController::class, 'digitalvisaLoadFunds']);
+            Route::post('{cardId}/block',         [CardController::class, 'digitalvisaBlock']);
+            Route::post('{cardId}/unblock',       [CardController::class, 'digitalvisaUnblock']);
+            Route::get('checkotp/{cardId}',     [CardController::class, 'digitalvisaCheckOtp']);
         });
 
     });

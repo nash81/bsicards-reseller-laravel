@@ -1,3 +1,4 @@
+import '../../models/transaction.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -22,6 +23,13 @@ class CardDetailScreen extends StatefulWidget {
 }
 
 class _CardDetailScreenState extends State<CardDetailScreen> {
+      // ...existing code...
+      // Add all missing methods and variables here
+      // _txAmount, _readAmount, _txMap, _digitalTabBar, _digitalTabContent, _digitalTabLabel, _depositsList, _transactionsList, _pointsList, _addonList, _showSnack, _showCopyToast
+      // Ensure context, widget, mounted are used correctly
+      // Remove VirtualCardTransaction references and replace with Transaction
+      // Fix unmatched parentheses and misplaced code
+      // ...existing code...
   VirtualCard? _detail;
   List<dynamic> _transactions = [];
   List<dynamic> _deposits = [];
@@ -32,9 +40,30 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
   bool _loadingToggle = false;
   bool _loading3ds = false;
   bool _loadingAddonAction = false;
+  bool _loadingOtp = false;
   String? _openingAddonCardId;
   _DigitalDetailTab _digitalTab = _DigitalDetailTab.transactions;
   final _amountCtrl = TextEditingController();
+
+  Widget _digitalTabChip({required String label, required bool selected, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primary : AppTheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : AppTheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -67,6 +96,12 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
           break;
         case 'visa':
           data = await CardService.getVisaCardDetail(
+            widget.card.cardId,
+            fallbackCard: fallbackCard,
+          );
+          break;
+        case 'digitalvisa':
+          data = await CardService.getDigitalVisaCardDetail(
             widget.card.cardId,
             fallbackCard: fallbackCard,
           );
@@ -164,12 +199,14 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     }
   }
 
-  void _showSnack(String msg, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? AppTheme.error : AppTheme.success,
-      ),
+  void _showSnack(String message, {bool isError = false}) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: isError ? Colors.red : Colors.green,
+      textColor: Colors.white,
+      fontSize: 16.0,
     );
   }
 
@@ -296,9 +333,11 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
   Future<void> _showLoadFundsSheet() async {
     if (mounted) setState(() => _loadingFunds = true);
     double? loadFee;
+    double? fixedFee;
     try {
       final fees = await CardService.getCardFees();
       loadFee = (fees['bsiload_fee'] as num?)?.toDouble();
+      fixedFee = (fees['bsifixed_fee'] as num?)?.toDouble();
     } catch (_) {}
 
     if (!mounted) return;
@@ -395,10 +434,11 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
                   const SizedBox(height: 16),
                   AppButton(label: context.tr('close'), outlined: true, onTap: () => Navigator.pop(context)),
                 ] else ...[
-                  Text(
-                    '${context.tr('fund_loading_fee_of')} ${((loadFee ?? 0)).toStringAsFixed(2)}% ${context.tr('will_be_charged')}',
-                    style: TextStyle(color: colors.textSecondary, fontSize: 13),
-                  ),
+                    Text(
+                      '${context.tr('fund_loading_fee_of')} ${((loadFee ?? 0)).toStringAsFixed(2)}%'
+                      '${fixedFee != null ? ' + \$${fixedFee.toStringAsFixed(2)}' : ''} ${context.tr('will_be_charged')}',
+                      style: TextStyle(color: colors.textSecondary, fontSize: 13),
+                    ),
                   const SizedBox(height: 16),
                   AppTextField(
                     label: context.tr('amount_usd'),
@@ -642,10 +682,34 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       _ActionBtn(
         icon: card.isBlocked ? Icons.lock_open : Icons.lock,
         label: card.isBlocked ? context.tr('unblock') : context.tr('block'),
-        color: card.isBlocked ? AppTheme.success : AppTheme.error,
-        isLoading: _loadingToggle,
-        onTap: _loadingToggle ? () {} : () => _toggleCardStatus(card),
+        color: Colors.grey,
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Feature not available at the moment. Contact support.')),
+          );
+        },
       ),
+      if (card.cardType == 'digitalvisa')
+        _ActionBtn(
+          icon: Icons.password,
+          label: 'OTP',
+          color: Colors.blue,
+          isLoading: _loadingOtp,
+          onTap: () async {
+            if (mounted) setState(() => _loadingOtp = true);
+            String? otp;
+            try {
+              otp = await CardService.digitalVisaCheckOtp(card.cardId, card.userEmail);
+            } catch (_) {
+              otp = null;
+            }
+            if (mounted) setState(() => _loadingOtp = false);
+            final msg = otp != null && otp.isNotEmpty ? 'OTP: $otp' : 'No OTP found';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(msg)),
+            );
+          },
+        ),
       if (card.cardType == 'digital')
         _ActionBtn(
           icon: Icons.security,
@@ -675,180 +739,177 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       );
     }
 
+    // Sort and group transactions by date
+    final txList = _transactions
+        .map((t) => _txMap(t))
+        .where((t) => t.isNotEmpty)
+        .toList();
+    txList.sort((a, b) {
+      final aDate = DateTime.tryParse(
+        (a['date'] ?? a['paymentDateTime'] ?? a['createdAt'] ?? a['created_at'] ?? a['updatedAt'] ?? a['transaction_date'] ?? '').toString(),
+      );
+      final bDate = DateTime.tryParse(
+        (b['date'] ?? b['paymentDateTime'] ?? b['createdAt'] ?? b['created_at'] ?? b['updatedAt'] ?? b['transaction_date'] ?? '').toString(),
+      );
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+
+    // Group by date
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final t in txList) {
+      final rawDate = (t['date'] ?? t['paymentDateTime'] ?? t['createdAt'] ?? t['created_at'] ?? t['updatedAt'] ?? t['transaction_date'] ?? '').toString();
+      DateTime? dt = DateTime.tryParse(rawDate);
+      if (dt == null) {
+        grouped['Unknown'] = (grouped['Unknown'] ?? [])..add(t);
+        continue;
+      }
+      final now = DateTime.now();
+      String label;
+      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+        label = 'Today';
+      } else if (dt.year == now.year && dt.month == now.month && dt.day == now.day - 1) {
+        label = 'Yesterday';
+      } else {
+        label = _formatTxDate(rawDate);
+      }
+      grouped[label] = (grouped[label] ?? [])..add(t);
+    }
+
+    // Build a flat list of widgets: date header, then transaction tiles
+    final List<Widget> children = [];
+    grouped.forEach((dateLabel, txs) {
+      children.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Text(
+          dateLabel,
+          style: TextStyle(
+            color: context.colors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+          ),
+        ),
+      ));
+      for (final t in txs) {
+        final type = (t['type'] ?? t['card_transaction_type'] ?? '').toString().toLowerCase();
+        final direction = (t['direction'] ?? '').toString().toLowerCase();
+        final isDeposit = direction == 'incoming';
+        final isCredit = [
+          'credit', 'deposit', 'refund', 'reversal', 'load', 'topup',
+        ].contains(type) || isDeposit;
+        final status = (t['status'] ?? '').toString().toLowerCase();
+        final narrative = (t['narrative'] ?? t['description'] ?? (t['merchant'] is Map<String, dynamic> ? t['merchant']['name'] : null) ?? context.tr('card_transaction')).toString();
+        final method = (t['method'] ?? t['transaction_type'] ?? t['transactionType'] ?? t['type'] ?? '').toString();
+        final reference = (t['reference'] ?? t['id'] ?? t['bridgecard_transaction_reference'] ?? t['client_transaction_reference'] ?? t['transactionHash'] ?? '').toString();
+        final createdAt = (t['date'] ?? t['paymentDateTime'] ?? t['createdAt'] ?? t['created_at'] ?? t['updatedAt'] ?? t['transaction_date'] ?? '').toString();
+        final amount = _txAmount(t);
+        final currency = ((t['currency'] ?? 'usd').toString()).toUpperCase();
+        final merchantLogo = _txMerchantLogoEnriched(t) ?? _txMerchantLogo(t);
+        final category = _txCategoryEnriched(t).isNotEmpty ? _txCategoryEnriched(t) : _txCategory(t);
+        final amountColor = isDeposit ? AppTheme.success : (isCredit ? AppTheme.income : AppTheme.expense);
+        final signedAmount = '${isDeposit ? '+' : (isCredit ? '+' : '-')}$currency ${amount.toStringAsFixed(2)}';
+        final statusText = [
+          if (status.isNotEmpty) status[0].toUpperCase() + status.substring(1),
+          if ((t['declineReason'] ?? '').toString().isNotEmpty) (t['declineReason'] ?? '').toString(),
+        ].join(' • ');
+        children.add(Divider(height: 1, indent: 74, color: context.colors.divider));
+        children.add(ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Container(
+            width: 40,
+            height: 40,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: amountColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: isDeposit
+                ? Icon(Icons.south_west_rounded, color: AppTheme.success, size: 18)
+                : merchantLogo != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          merchantLogo,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            isCredit ? Icons.south_west_rounded : Icons.north_east_rounded,
+                            color: amountColor,
+                            size: 18,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        isCredit ? Icons.south_west_rounded : Icons.north_east_rounded,
+                        color: amountColor,
+                        size: 18,
+                      ),
+          ),
+          title: Text(
+            narrative,
+            style: TextStyle(
+                color: context.colors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            [
+              if (method.isNotEmpty) method,
+              if (category.isNotEmpty) category,
+              if (statusText.isNotEmpty) statusText,
+              if (createdAt.isNotEmpty) _formatTxDate(createdAt),
+              if (reference.isNotEmpty) '#$reference',
+            ].join(' • '),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: context.colors.textSecondary, fontSize: 11.5),
+          ),
+          trailing: Text(
+            signedAmount,
+            style: TextStyle(
+                color: amountColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 14),
+          ),
+        ));
+      }
+    });
+
     return Container(
       decoration: BoxDecoration(
         color: context.colors.bgCard,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: ListView.separated(
+      child: ListView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: _transactions.length,
-        separatorBuilder: (_, __) =>
-            Divider(height: 1, indent: 74, color: context.colors.divider),
-        itemBuilder: (_, i) {
-          final t = _txMap(_transactions[i]);
-          final type = (t['type'] ?? t['card_transaction_type'] ?? '')
-              .toString()
-              .toLowerCase();
-          final isCredit = [
-            'credit',
-            'deposit',
-            'refund',
-            'reversal',
-            'load',
-            'topup',
-          ].contains(type);
-          final status = (t['status'] ?? '').toString().toLowerCase();
-          final narrative =
-              (t['narrative'] ??
-                      t['description'] ??
-                      (t['merchant'] is Map<String, dynamic>
-                          ? t['merchant']['name']
-                          : null) ??
-                      context.tr('card_transaction'))
-                  .toString();
-          final method =
-              (t['method'] ??
-                      t['transaction_type'] ??
-                      t['transactionType'] ??
-                      t['type'] ??
-                      '')
-                  .toString();
-          final reference = (t['reference'] ??
-                  t['id'] ??
-                  t['bridgecard_transaction_reference'] ??
-                  t['client_transaction_reference'] ??
-                  t['transactionHash'] ??
-                  '')
-              .toString();
-          final createdAt =
-              (t['paymentDateTime'] ??
-                      t['createdAt'] ??
-                      t['created_at'] ??
-                      t['updatedAt'] ??
-                      t['transaction_date'] ??
-                      '')
-                  .toString();
-          final amount = _txAmount(t);
-          final currency = ((t['currency'] ?? 'usd').toString()).toUpperCase();
-          final merchantLogo = _txMerchantLogo(t);
-          final category = _txCategory(t);
-
-          final amountColor = isCredit ? AppTheme.income : AppTheme.expense;
-          final signedAmount = '${isCredit ? '+' : '-'}$currency ${amount.toStringAsFixed(2)}';
-          final statusText = [
-            if (status.isNotEmpty) status[0].toUpperCase() + status.substring(1),
-            if ((t['declineReason'] ?? '').toString().isNotEmpty)
-              (t['declineReason'] ?? '').toString(),
-          ].join(' • ');
-
-          return ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Container(
-              width: 40,
-              height: 40,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: amountColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: merchantLogo != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        merchantLogo,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
-                          isCredit
-                              ? Icons.south_west_rounded
-                              : Icons.north_east_rounded,
-                          color: amountColor,
-                          size: 18,
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      isCredit
-                          ? Icons.south_west_rounded
-                          : Icons.north_east_rounded,
-                      color: amountColor,
-                      size: 18,
-                    ),
-            ),
-            title: Text(
-              narrative,
-              style: TextStyle(
-                  color: context.colors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              [
-                if (method.isNotEmpty) method,
-                if (category.isNotEmpty) category,
-                if (statusText.isNotEmpty) statusText,
-                if (createdAt.isNotEmpty) _formatTxDate(createdAt),
-                if (reference.isNotEmpty) '#$reference',
-              ].join(' • '),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: context.colors.textSecondary, fontSize: 11.5),
-            ),
-            trailing: Text(
-              signedAmount,
-              style: TextStyle(
-                  color: amountColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14),
-            ),
-          );
-        },
+        itemCount: children.length,
+        itemBuilder: (_, i) => children[i],
       ),
-    ).animate().fadeIn(delay: 300.ms);
+    );
   }
 
-  Map<String, dynamic> _txMap(dynamic raw) {
-    if (raw is Map<String, dynamic>) return raw;
-    return <String, dynamic>{};
+  String _txMerchantLogo(Map<String, dynamic> t) {
+    if (t['merchant'] is Map<String, dynamic>) {
+      return (t['merchant']['logo'] ?? '').toString();
+    }
+    return '';
   }
 
-  double _txAmount(Map<String, dynamic> t) {
-    final centRaw = t['centAmount'];
-    if (centRaw != null) {
-      final cents = double.tryParse(centRaw.toString());
-      if (cents != null) return cents / 100;
+  String _txCategory(Map<String, dynamic> t) {
+    if (t['merchant'] is Map<String, dynamic>) {
+      return (t['merchant']['category'] ?? '').toString();
     }
-    final amount = _readAmount(t, 'amount');
-    if (amount != null && amount != 0) {
-      // BridgeCard Mastercard history can provide whole-number minor units in `amount`.
-      if (t.containsKey('card_transaction_type') && !t.containsKey('centAmount')) {
-        return amount.abs() / 100;
-      }
-
-      return amount.abs();
-    }
-
-    // Digital payloads can carry usable value in merchant/original amount.
-    for (final key in ['merchantAmount', 'originalAmount', 'originalMerchantAmount']) {
-      final fallback = _readAmount(t, key);
-      if (fallback != null && fallback != 0) {
-        return fallback.abs();
-      }
-    }
-
-    if (amount != null) return amount.abs();
-    return 0;
+    return '';
   }
 
-  double? _readAmount(Map<String, dynamic> t, String key) {
-    final raw = t[key];
-    if (raw == null) return null;
-    if (raw is num) return raw.toDouble();
-    return double.tryParse(raw.toString());
+  String _formatTxDate(String raw) {
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return raw;
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   Widget _digitalTabBar(VirtualCard card) {
@@ -864,7 +925,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
       child: Row(
         children: [
           for (final tab in tabs) ...[
-            _DigitalTabChip(
+            _digitalTabChip(
               label: _digitalTabLabel(tab),
               selected: _digitalTab == tab,
               onTap: () => setState(() => _digitalTab = tab),
@@ -906,65 +967,115 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
   }
 
   Widget _depositsList() {
-    if (_deposits.isEmpty) {
+    if (_transactions.isEmpty) {
       return EmptyState(
-        icon: Icons.account_balance_wallet_outlined,
-        title: context.tr('no_deposits'),
-        subtitle: context.tr('deposits_for_card_will_appear'),
+        icon: Icons.receipt_long_outlined,
+        title: context.tr('no_card_transactions'),
+        subtitle: context.tr('card_transactions_will_appear'),
       );
     }
 
-    return _sectionContainer(
-      ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _deposits.length,
-        separatorBuilder: (_, __) =>
-            Divider(height: 1, indent: 72, color: context.colors.divider),
-        itemBuilder: (_, i) {
-          final deposit = _txMap(_deposits[i]);
-          final hash = (deposit['transactionHash'] ?? '').toString();
-          final amount = _depositAmount(deposit);
+    // Sort and group deposits by date
+    final depositList = _deposits
+        .map((d) => d as Map<String, dynamic>)
+        .where((d) => d.isNotEmpty)
+        .toList();
+    depositList.sort((a, b) {
+      final aDate = DateTime.tryParse((a['createdAt'] ?? a['created_at'] ?? a['updatedAt'] ?? a['deposit_date'] ?? '').toString());
+      final bDate = DateTime.tryParse((b['createdAt'] ?? b['created_at'] ?? b['updatedAt'] ?? b['deposit_date'] ?? '').toString());
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
 
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppTheme.success.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.south_west_rounded, color: AppTheme.success, size: 18),
+    // Group by date
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final d in depositList) {
+      final rawDate = (d['createdAt'] ?? d['created_at'] ?? d['updatedAt'] ?? d['deposit_date'] ?? '').toString();
+      DateTime? dt = DateTime.tryParse(rawDate);
+      if (dt == null) {
+        grouped['Unknown'] = (grouped['Unknown'] ?? [])..add(d);
+        continue;
+      }
+      final now = DateTime.now();
+      String label;
+      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+        label = 'Today';
+      } else if (dt.year == now.year && dt.month == now.month && dt.day == now.day - 1) {
+        label = 'Yesterday';
+      } else {
+        label = _formatTxDate(rawDate);
+      }
+      grouped[label] = (grouped[label] ?? [])..add(d);
+    }
+
+    // Build a flat list of widgets: date header, then deposit tiles
+    final List<Widget> children = [];
+    grouped.forEach((dateLabel, deposits) {
+      children.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Text(
+          dateLabel,
+          style: TextStyle(
+            color: context.colors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+          ),
+        ),
+      ));
+      for (final d in deposits) {
+        final amount = _depositAmount(d);
+        final currency = ((d['currency'] ?? 'usd').toString()).toUpperCase();
+        final status = (d['status'] ?? '').toString().toLowerCase();
+        final reference = (d['reference'] ?? d['id'] ?? '').toString();
+        final createdAt = (d['createdAt'] ?? d['created_at'] ?? d['updatedAt'] ?? d['deposit_date'] ?? '').toString();
+        final statusText = status.isNotEmpty ? status[0].toUpperCase() + status.substring(1) : '';
+        children.add(Divider(height: 1, indent: 74, color: context.colors.divider));
+        children.add(ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppTheme.income.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            title: Text(
-              context.tr('deposit'),
-              style: TextStyle(
-                color: context.colors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Icon(Icons.arrow_downward_rounded, color: AppTheme.income, size: 18),
+          ),
+          title: Text(
+            '${currency} ${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: context.colors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
-            subtitle: Text(
-              [
-                if ((deposit['createdAt'] ?? '').toString().isNotEmpty)
-                  _formatTxDate((deposit['createdAt'] ?? '').toString()),
-                if (hash.isNotEmpty) _truncateMiddle(hash),
-              ].join(' • '),
-              style: TextStyle(color: context.colors.textSecondary, fontSize: 11.5),
-            ),
-            trailing: Text(
-              '+USDC ${amount.toStringAsFixed(2)}',
-              style: const TextStyle(
-                color: AppTheme.success,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
-            ),
-          );
-        },
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            [
+              if (statusText.isNotEmpty) statusText,
+              if (createdAt.isNotEmpty) _formatTxDate(createdAt),
+              if (reference.isNotEmpty) '#$reference',
+            ].join(' • '),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: context.colors.textSecondary, fontSize: 11.5),
+          ),
+        ));
+      }
+    });
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.bgCard,
+        borderRadius: BorderRadius.circular(16),
       ),
-    ).animate().fadeIn(delay: 300.ms);
+      child: Column(
+        children: children,
+      ),
+    );
   }
 
   Widget _pointsList() {
@@ -1033,7 +1144,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
           );
         },
       ),
-    ).animate().fadeIn(delay: 300.ms);
+    );
   }
 
   Widget _addonList() {
@@ -1093,7 +1204,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
           );
         },
       ),
-    ).animate().fadeIn(delay: 300.ms);
+    );
   }
 
   Widget _sectionContainer(Widget child) {
@@ -1129,7 +1240,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     return '${value.substring(0, edge)}...${value.substring(value.length - edge)}';
   }
 
-  String? _txMerchantLogo(Map<String, dynamic> t) {
+  String? _txMerchantLogoEnriched(Map<String, dynamic> t) {
     final enriched = t['enriched_data'];
     if (enriched is Map<String, dynamic>) {
       final logo = enriched['merchant_logo']?.toString();
@@ -1138,7 +1249,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     return null;
   }
 
-  String _txCategory(Map<String, dynamic> t) {
+  String _txCategoryEnriched(Map<String, dynamic> t) {
     final enriched = t['enriched_data'];
     if (enriched is Map<String, dynamic>) {
       return (enriched['transaction_category'] ?? '').toString();
@@ -1146,7 +1257,7 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     return '';
   }
 
-  String _formatTxDate(String raw) {
+  String _formatTxDateDetailed(String raw) {
     try {
       final dt = DateTime.parse(raw).toLocal();
       final mm = dt.month.toString().padLeft(2, '0');
@@ -1378,6 +1489,41 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
     );
   }
 
+  Map<String, dynamic> _txMap(dynamic t) {
+    if (t is Map<String, dynamic>) return t;
+    if (t is Transaction) return t.toJson();
+    return {};
+  }
+
+  double _txAmount(Map<String, dynamic> t) {
+    final centRaw = t['centAmount'];
+    if (centRaw != null) {
+      final cents = double.tryParse(centRaw.toString());
+      if (cents != null) return cents / 100;
+    }
+    final amount = _readAmount(t, 'amount');
+    if (amount != null && amount != 0) {
+      if (t.containsKey('card_transaction_type') && !t.containsKey('centAmount')) {
+        return amount.abs() / 100;
+      }
+      return amount.abs();
+    }
+    for (final key in ['merchantAmount', 'originalAmount', 'originalMerchantAmount']) {
+      final fallback = _readAmount(t, key);
+      if (fallback != null && fallback != 0) {
+        return fallback.abs();
+      }
+    }
+    if (amount != null) return amount.abs();
+    return 0;
+  }
+
+  double? _readAmount(Map<String, dynamic> t, String key) {
+    final raw = t[key];
+    if (raw == null) return null;
+    if (raw is num) return raw.toDouble();
+    return double.tryParse(raw.toString());
+  }
 }
 
 class _DepositAddressTile extends StatelessWidget {
@@ -1767,6 +1913,10 @@ class _CardBack extends StatelessWidget {
     ).animate().fadeIn(duration: 220.ms);
   }
 }
+
+
+
+
 
 
 

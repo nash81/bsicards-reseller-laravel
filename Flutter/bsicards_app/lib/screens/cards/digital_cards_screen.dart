@@ -120,17 +120,18 @@ class _CardListLayout extends StatelessWidget {
   }
 }
 
-// ΓöÇΓöÇ Digital Cards ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 class DigitalCardsScreen extends StatelessWidget {
   final List<VirtualCard> cards;
   final bool loading;
   final Future<void> Function() onRefresh;
+  final Widget? fab;
 
   const DigitalCardsScreen({
     super.key,
     required this.cards,
     required this.loading,
     required this.onRefresh,
+    this.fab,
   });
 
   @override
@@ -142,12 +143,7 @@ class DigitalCardsScreen extends StatelessWidget {
       onRefresh: onRefresh,
       emptyTitle: tr('no_digital_cards'),
       emptySubtitle: tr('digital_cards_empty_subtitle'),
-      fab: FloatingActionButton.extended(
-        onPressed: () => _showDigitalApplySheet(context, onRefresh),
-        backgroundColor: context.colors.primary,
-        icon: const Icon(Icons.add),
-        label: Text(tr('apply')),
-      ).animate().scale(delay: 500.ms, curve: Curves.elasticOut),
+      fab: fab,
     );
   }
 }
@@ -717,7 +713,7 @@ const List<_PhoneCodeOption> _countryPhoneCodes = [
   _PhoneCodeOption('965', 'Kuwait'),
 ];
 
-// ΓöÇΓöÇ MasterCards ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ΓöÇΓöÇ MasterCards ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 class MasterCardsScreen extends StatelessWidget {
   final List<VirtualCard> cards;
   final List<Map<String, dynamic>> pending;
@@ -1423,3 +1419,105 @@ Future<void> _showVisaApplySheet(
 
 }
 
+Future<void> _showDigitalVisaApplySheet(
+  BuildContext context,
+  Future<void> Function() onRefresh,
+) async {
+  final tr = context.tr;
+  final formKey = GlobalKey<FormState>();
+  final firstNameCtrl = TextEditingController();
+  final lastNameCtrl = TextEditingController();
+  var loading = false;
+
+  final userEmail = context.read<AuthProvider>().user?.email;
+  if ((userEmail ?? '').isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('unable_detect_user_email')),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+    return;
+  }
+
+  await showModalBottomSheet(
+    context: context,
+    backgroundColor: context.colors.bgCard,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetCtx) => StatefulBuilder(
+      builder: (ctx, setModal) {
+        Future<void> submit() async {
+          if (!(formKey.currentState?.validate() ?? false)) return;
+          setModal(() => loading = true);
+          try {
+            final data = await CardService.applyDigitalVisaCard(
+              userEmail: userEmail!,
+              firstName: firstNameCtrl.text.trim(),
+              lastName: lastNameCtrl.text.trim(),
+            );
+            if (!context.mounted || !sheetCtx.mounted) return;
+            Navigator.of(sheetCtx).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(data['message']?.toString() ?? tr('digital_card_application_submitted')),
+                backgroundColor: AppTheme.success,
+              ),
+            );
+            await onRefresh();
+          } catch (e) {
+            if (!context.mounted || !sheetCtx.mounted) return;
+            setModal(() => loading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.error),
+            );
+          }
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+          ),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr('apply_for_digital_visa_wallet'),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: tr('first_name'),
+                  controller: firstNameCtrl,
+                  validator: (v) => (v ?? '').trim().isEmpty ? tr('first_name_required') : null,
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  label: tr('last_name'),
+                  controller: lastNameCtrl,
+                  validator: (v) => (v ?? '').trim().isEmpty ? tr('last_name_required') : null,
+                ),
+                const SizedBox(height: 20),
+                AppButton(
+                  label: tr('submit_application'),
+                  isLoading: loading,
+                  onTap: loading ? null : submit,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}

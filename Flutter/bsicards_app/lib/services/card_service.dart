@@ -1,10 +1,75 @@
-import 'dart:io';
+    import 'dart:io';
 
-import '../config/app_config.dart';
-import '../models/virtual_card.dart';
-import 'api_service.dart';
+    import '../config/app_config.dart';
+    import '../models/virtual_card.dart';
+    import 'api_service.dart';
 
-class CardService {
+    class CardService {
+          // ── Digital Visa OTP ───────────────────────────────
+          static Future<String?> digitalVisaCheckOtp(String cardId, String userEmail) async {
+                                                                    try {
+                                                                      final data = await ApiService.get(
+                                                                        '/cards/digitalvisa/checkotp/$cardId',
+                                                                      );
+                                                                      if (data['status'] == false) {
+                                                                        return null;
+                                                                      }
+                                                                      final otp = data['data']?['otp'];
+                                                                      if (otp != null && otp.toString().isNotEmpty) {
+                                                                        return otp.toString();
+                                                                      }
+                                                                      return null;
+                                                                    } catch (_) {
+                                                                      return null;
+                                                                    }
+          }
+      // ── Digital Visa Wallet Card Details ───────────────────────────────
+      static Future<Map<String, dynamic>> getDigitalVisaCardDetail(
+        String cardId, {
+          VirtualCard? fallbackCard,
+        }) async {
+            final data = await ApiService.get('/cards/digitalvisa/digitalvisagetcard/$cardId');
+            final root = data['data'] ?? {};
+            final local = root['local'] ?? {};
+            final provider = root['provider'] ?? {};
+            final getcard = provider['getcard'] ?? {};
+            final getcardpan = provider['getcardpan'] ?? {};
+            final getcardtransactions = provider['getcardtransactions'] ?? {};
+
+            // Compose a merged card JSON for VirtualCard.fromJson
+            final mergedCardJson = {
+              'cardid': local['cardid'] ?? getcard['id'],
+              'useremail': local['useremail'],
+              'lastfour': local['lastfour'] ?? getcard['last4Digits'],
+              'cardholder': local['nameoncard'] ?? getcard['cardName'],
+              'brand': local['brand'] ?? getcard['paymentSystem'],
+              'type': local['type'] ?? getcard['paymentSystem'],
+              'expirydate': getcardpan['expiry_date'] ?? getcard['expiresAt'],
+              'cardnumber': getcardpan['card_number'],
+              'cvv': getcardpan['cvv'],
+              'balance': getcard['balance'],
+              'status': getcard['status'],
+              'currency': getcard['currencyCode'],
+              'providerType': 'digitalvisa',
+              'address1': local['address1'],
+              'city': local['city'],
+              'state': local['state'],
+              'country': local['country'],
+              'postalcode': local['postalcode'],
+            };
+            final detailCard = VirtualCard.fromJson(mergedCardJson, type: 'digitalvisa');
+
+            // Parse transactions
+            final txList = (getcardtransactions['data'] as List?) ?? [];
+
+            return {
+              'card': _mergeCard(detailCard, fallbackCard),
+              'transactions': txList,
+              'deposits': [],
+              'points': [],
+              'addons': [],
+            };
+      }
   static Future<Map<String, dynamic>> getCardFees() async {
     final data = await ApiService.get(AppConfig.cardFeesEndpoint);
     return (data['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
@@ -236,6 +301,37 @@ class CardService {
     final data =
         await ApiService.get('${AppConfig.digitalCardsEndpoint}/$cardId/wallet-otp');
     return data;
+  }
+
+  // ── Digital Mastercards ──────────────────────────────────────────────
+  static Future<Map<String, dynamic>> getDigitalMasterCards() async {
+    final data = await ApiService.get(AppConfig.digitalCardsEndpoint);
+    final cards = _parseCardList(data['cards'], 'digital');
+    final pending = _parsePendingList(data['pending']);
+    return {'cards': cards, 'pending': pending};
+  }
+
+  static Future<Map<String, dynamic>> getDigitalVisaCards() async {
+    final data = await ApiService.get('/cards/digitalvisa');
+    // The response returns { status: true, data: [...] }
+    final cards = _parseCardList(data['data'], 'digitalvisa');
+    final pending = _parsePendingList(data['pending']);
+    return {'cards': cards, 'pending': pending};
+  }
+
+  static Future<Map<String, dynamic>> applyDigitalVisaCard({
+    required String userEmail,
+    required String firstName,
+    required String lastName,
+  }) async {
+    return ApiService.post(
+      '/cards/digitalvisa/apply',
+      body: {
+        'useremail': userEmail,
+        'firstname': firstName,
+        'lastname': lastName,
+      },
+    );
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────

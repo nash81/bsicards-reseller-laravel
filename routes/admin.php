@@ -46,6 +46,7 @@ use App\Http\Controllers\Backend\UserController;
 use App\Http\Controllers\Backend\UserNavigationController;
 use App\Http\Controllers\Backend\WireTransferController;
 use App\Http\Controllers\Backend\WithdrawController;
+use App\Http\Controllers\Backend\CardTransactionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -442,3 +443,9 @@ Route::get('application-info', [AppController::class, 'applicationInfo'])->name(
 Route::get('clear-cache', [AppController::class, 'clearCache'])->name('clear-cache');
 
 Route::post('logout', [AuthController::class, 'logout'])->name('logout')->withoutMiddleware('isDemo');
+
+//===============================  Card Transactions ==================================
+Route::get('card/available-balance', [CardTransactionController::class, 'availableBalance'])->name('card.available_balance');
+Route::get('card/issued-cards', [CardTransactionController::class, 'issuedCards'])->name('card.issued_cards');
+Route::get('card/card-transactions', [CardTransactionController::class, 'cardTransactions'])->name('card.card_transactions');
+

@@ -113,6 +113,15 @@
             <li class="side-nav-item {{ isActive('admin.transactions') }}">
                 <a href="{{route('admin.transactions')}}"><i data-lucide="cast"></i><span>{{ __('Transactions') }}</span></a>
             </li>
+            <li class="side-nav-item {{ isActive('admin.card.available_balance') }}">
+                <a href="{{ route('admin.card.available_balance') }}"><i data-lucide="wallet"></i><span>Available Balance</span></a>
+            </li>
+            <li class="side-nav-item {{ isActive('admin.card.issued_cards') }}">
+                <a href="{{ route('admin.card.issued_cards') }}"><i data-lucide="credit-card"></i><span>Issued Cards</span></a>
+            </li>
+            <li class="side-nav-item {{ isActive('admin.card.card_transactions') }}">
+                <a href="{{ route('admin.card.card_transactions') }}"><i data-lucide="list"></i><span>Card Transactions</span></a>
+            </li>
             @endcan
 
             @endcanany

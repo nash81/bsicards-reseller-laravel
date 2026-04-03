@@ -1,0 +1,26 @@
+name: Packagist Update
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  notify-packagist:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Packagist update
+        env:
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          if [ -z "$PACKAGIST_TOKEN" ]; then
+            echo "PACKAGIST_TOKEN not set, skipping Packagist update"
+            exit 0
+          fi
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            "https://packagist.org/api/update-package?username=nash81&apiToken=$PACKAGIST_TOKEN" \
+            -d '{"repository":{"url":"https://github.com/nash81/bsicards-php-sdk"}}'

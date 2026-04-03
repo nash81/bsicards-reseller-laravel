@@ -1,0 +1,11 @@
+parameters:
+  level: 5
+  paths:
+    - src
+    - tests
+  excludePaths:
+    - vendor
+  # Ignore Laravel functions that are only available when Laravel is installed
+  bootstrapFiles:
+    - phpstan-bootstrap.php
+

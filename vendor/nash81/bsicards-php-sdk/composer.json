@@ -1,0 +1,54 @@
+{
+  "name": "nash81/bsicards-php-sdk",
+  "description": "PHP SDK for BSICARDS - Card Issuance API",
+  "type": "library",
+  "license": "MIT",
+  "homepage": "https://github.com/nash81/bsicards-php-sdk",
+  "support": {
+    "email": "cs@bsigroup.tech",
+    "source": "https://github.com/nash81/bsicards-php-sdk",
+    "issues": "https://github.com/nash81/bsicards-php-sdk/issues"
+  },
+  "keywords": [
+    "bsicards",
+    "card-issuance",
+    "mastercard",
+    "visa",
+    "digital-wallet",
+    "api",
+    "sdk"
+  ],
+  "authors": [
+    {
+      "name": "BSI Group",
+      "email": "cs@bsigroup.tech"
+    }
+  ],
+  "require": {
+    "php": ">=8.1",
+    "guzzlehttp/guzzle": "^7.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5",
+    "phpstan/phpstan": "^1.8",
+    "illuminate/support": "^9.0|^10.0|^11.0"
+  },
+  "suggest": {
+    "illuminate/support": "For Laravel integration (optional)"
+  },
+  "autoload": {
+    "psr-4": {
+      "BSICards\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "BSICards\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit tests/",
+    "test-coverage": "phpunit --coverage-html build/coverage tests/",
+    "analyse": "phpstan analyse --configuration=phpstan.neon"
+  }
+}

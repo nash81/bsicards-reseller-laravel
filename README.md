@@ -70,6 +70,7 @@ Set at least:
 
 ```env
 APP_URL=https://your-domain.com
+API_ENDPOINT=https://cards.bsigroup.tech/api/merchant
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -79,6 +80,8 @@ DB_PASSWORD=your_database_password
 ```
 
 > On many cPanel hosts, `DB_HOST` remains `localhost` or `127.0.0.1`. Use the value provided by your host.
+>
+> For `API_ENDPOINT`, update it with your custom API endpoint received from BSICards, or use the default: `https://cards.bsigroup.tech/api/merchant`.
 
 ## 5) Run the web installer
 
